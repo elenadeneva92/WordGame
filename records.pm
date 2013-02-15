@@ -2,15 +2,18 @@
 package  RECORDS;
 use DBI qw(:sql_types);
 my $dbfile = "C:\\Perl64\\game\\records.db";
+
+# The save function saves player result.
 sub save {
 	my $name = shift;
 	die "Error!!! This is a class method" if ref $name;
 	my $points = shift;
 	my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","");
 	my $check = $dbh->table_info("%","%","records","TABLE");
+	#if there is no DB, create it
 	if (!$check->fetch) {
 		print "initial import";
-			$dbh->do(qq{
+		$dbh->do(qq{
 		CREATE TABLE records(
 			id integer primary key autoincrement,
 			name carchar,
@@ -25,6 +28,7 @@ sub save {
 	$sth->execute($name, $points);
 }
 
+# The max function finds the player with maximum points
 sub max {
 my ($class) = shift;
 	die "error" if ref $class;

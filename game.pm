@@ -1,9 +1,18 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 package  GAME;
 use strict;
 use Moose;
 use threads;
 use threads::shared;
+
+#used to make the game obejcts shared
+around 'new' => sub {
+        my $orig = shift;
+        my $class = shift;
+        my $self = $class->$orig(@_);
+        my $shared_self : shared = shared_clone($self);
+        return $shared_self;
+    };
 
 has 'word' => (isa =>'Str', is => 'rw');
 has 'points' => (isa =>'Int', is => 'rw');
@@ -11,13 +20,18 @@ has 'startTime' => (isa =>'Int', is => 'rw');
 has 'dict' => (is => 'rw', isa => 'ArrayRef');
 has 'words' => (is=> 'rw', isa => 'ArrayRef[Object]', default => sub { [] },);
 has 'isSaved' => (isa =>'Int', is => 'rw');
+has 'name' => (is => 'rw', isa => 'Str');
+has 'inProcess'=>(is => 'rw', isa => 'Bool');
 
-sub start{
-	my ($self) = @_;
+#start a game with passed name
+sub start($){
+	my ($self, $name) = @_;
+	$self->name($name);
 	$self->points(0);
 	$self->isSaved(0);
 	$self->startTime(time());
 	$self->word($self->generate);
+	$self->inProcess(1);
 }
 
 #return the left time 
@@ -41,7 +55,7 @@ sub serve{
 	} elsif ($command eq "TIME")  {
 		return $self->get_time();
 	} elsif ($command eq "NEW GAME")  {
-		$self->start;
+		$self->start($self->name);
 		@{$self->words} = ();
 		return $self->word;
 	} elsif($command eq "MY WORDS") {
@@ -134,7 +148,8 @@ sub generate() {
 	$word;
 }
 
-
+#check if a word has only letters that are in the pattern
+#Example: reverse -> preserve
 sub check($$$){
 	my ($self, $word,$patt) = @_;
 	return 0 if (length($word) > length($patt));
@@ -144,8 +159,10 @@ sub check($$$){
 	}
 	1;
 }
+
+#return the count of char in a string
 sub count($$$) {
-	my ($self, $char,$word) = @_;
+	my ($self, $char, $word) = @_;
 	my $count = 0;
 	for(my $i = 0; $i < length($word); $i++) {
 		if (substr($word, $i, 1) eq $char) {
@@ -153,5 +170,15 @@ sub count($$$) {
 		}
 	}
 	$count;
+}
+
+#get the info for a player in string format
+sub info {
+	my ($self) = @_; 
+	my $result = "Name : ".$self->name.";";
+	$result .= "Points : ".$self->points.";";
+	$result .= "In process : ".$self->inProcess.";";
+	$result .= "Start last game : ".localtime($self->startTime).";";
+	$result;
 }
 1;

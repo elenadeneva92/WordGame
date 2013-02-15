@@ -5,49 +5,50 @@ use strict;
 my $address = $ARGV[0] or die "Error: server name is missing\n";
 my $port = $ARGV[1] or die "Error: port is missing\n";
 
-my $serverSocket = IO::Socket::INET->new( 
-		PeerAddr => $address,
-		PeerPort => $port,
-		Proto => 'tcp') or die "Error: Unable to create socket ($!)\n";
-
-print "Welcome to WordWorm! \nTo start a new game enter a NEW GAME,
-to view your points enter POINTS,
-to save your current result enter  SAVE,
-to view the words you already used enter MY WORDS,
-to view the best score enter FIRST,
-to quit the game enter QUIT!\n
-The game start now!\n";
-
-$serverSocket->autoflush(1);
+my $server_socket = IO::Socket::INET->new( PeerAddr => $address,
+		                                       PeerPort => $port,
+	                                           	Proto => 'tcp') or die "Error: Unable to create socket ($!)\n";
+$server_socket->autoflush(1);
 STDOUT->autoflush(1);
 
-#first receive the word we are playing with
-my $word = <$serverSocket>;
-print "Your word : ".uc($word)."Enter your choice : ";
+my $HELP = <<END;
+ NEW GAME -> To start a new game,
+ POINTS -> to view your points,
+ SAVE -> to save your current result enter,
+ MY WORDS -> to view the words you already used enter
+ FIRST -> to view the best score enter
+ HELP -> to view this message again eneter 
+ QUIT -> to quit the game enter !\n
+END
+
+print "Welcome to WordWorm!\n\n".$HELP."The game starts now!\nEnter your name: ";
+
+exit if (my $name = <STDIN>) eq "\n";
+
+print $server_socket $name;
+
+my $word = <$server_socket>;
+print "Your word : ".uc($word)."WordGame>";
+
 while (my $request = <STDIN>) {
-	print $serverSocket $request; 
-	last if $request eq "QUIT\n";
-	my $response = <$serverSocket>;
-	last if $response eq "";
-	chomp $request;
-	if ($request eq "NEW GAME") {
-		$word = $response;
-		print "New word : ".uc($word);
-	} elsif($request eq "SAVE") {
-		if ($response eq "NAME\n") {
-			print "Enter your name : ";
-			my $name;
-			while (($name = <STDIN>) !~ m/^\D[a-zA-z0-9]*$/){
-				print "Your name must begin with letter and contain only letters and digits\nEnter your name : ";
-			}
-			print $serverSocket $name;
-			$response = <$serverSocket>;
-		}
-		print $response;
-	} else {
-		print $response;
-		print "Word : ".uc($word) if ($response ne "No time left\n");
-	}
-	print "Enter your choice :  ";
+  print "\n".$HELP."WordGame>" and next if $request eq  "HELP\n";
+  print "WordGame>" and next if $request eq "\n";
+  print $server_socket $request;
+  last if $request eq "QUIT\n";
+
+  my $response = <$server_socket>;
+  next if $response eq ""; #no connection
+  chomp $request;
+
+  if ($request eq "NEW GAME") {
+    $word = $response;
+    print "New word : ".uc($word);
+  } elsif($request eq "SAVE") {
+    print $response;
+  } else {
+    print $response;
+    print "Word : ".uc($word) if ($response ne "No time left\n");
+  }
+  print "WordGame>";
 }
-close $serverSocket or die "Error: Unable to close socket ($!)\n";
+close $server_socket or die "Error: Unable to close socket ($!)\n";
