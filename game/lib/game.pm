@@ -1,11 +1,15 @@
 #!/usr/bin/perl -w
+
 package  GAME;
+
 use strict;
 use Moose;
 use threads;
 use threads::shared;
+use Switch::Plain;
+use List::Util qw(reduce);
 
-#used to make the game obejcts shared
+# Used to make the game obejcts shared
 around 'new' => sub {
         my $orig = shift;
         my $class = shift;
@@ -16,72 +20,65 @@ around 'new' => sub {
 
 has 'word' => (isa =>'Str', is => 'rw');
 has 'points' => (isa =>'Int', is => 'rw');
-has 'startTime' => (isa =>'Int', is => 'rw');
+has 'start_time' => (isa =>'Int', is => 'rw');
 has 'dict' => (is => 'rw', isa => 'ArrayRef');
 has 'words' => (is=> 'rw', isa => 'ArrayRef[Object]', default => sub { [] },);
-has 'isSaved' => (isa =>'Int', is => 'rw');
+has 'is_saved' => (isa =>'Int', is => 'rw');
 has 'name' => (is => 'rw', isa => 'Str');
-has 'inProcess'=>(is => 'rw', isa => 'Bool');
+has 'in_process'=>(is => 'rw', isa => 'Bool');
 
-#start a game with passed name
+# Used to start a game with passed name
 sub start($){
 	my ($self, $name) = @_;
 	$self->name($name);
 	$self->points(0);
-	$self->isSaved(0);
-	$self->startTime(time());
+	$self->is_saved(0);
+	$self->start_time(time());
 	$self->word($self->generate);
-	$self->inProcess(1);
+	$self->in_process(1);
 }
 
-#return the left time 
-sub get_time {
+# Used to obtain the left time of the player
+sub left_time {
 	my $self = shift;
-	my $rest = 60 - time() + $self->startTime;
+	my $rest = 60 - time() + $self->start_time;
 	$rest >= 0 ? $rest : 0;
 }
 
-#save the results
+# Used save the results
 sub save {
 	my $self = shift;
-	$self->isSaved(1);
+	$self->is_saved(1);
 }
 
-#serve a request
-sub serve{
-	my ($self, $command) = @_;
-	if ($command eq "POINTS") {
-		return $self->points;
-	} elsif ($command eq "TIME")  {
-		return $self->get_time();
-	} elsif ($command eq "NEW GAME")  {
-		$self->start($self->name);
-		@{$self->words} = ();
-		return $self->word;
-	} elsif($command eq "MY WORDS") {
-		return "Used words: @{$self->words}";
-	} else { 
-		if ($self->get_time() == 0) {
-			return "No time left";
-		}
-		if (my $points = $self->try($command)) {
-			return "Points: ".$points;
-		} else {
-			return "Invalid word!";
-		}
-	}
+# Used to serve a request
+sub serve {
+  my ($self, $command) = @_;
+    sswitch ($command) {
+    case "POINTS": { return $self->points }
+    case "TIME": { return $self->left_time() }
+    case "NEW GAME": { $self->start($self->name); @{$self->words} = (); return $self->word }
+    case "MY WORDS": { return "Used words: @{$self->words}" }
+    default: { return check_word($self, $command) }
+  }
+}
+
+sub check_word($$) {
+  my ($self, $word) = @_;
+  return "No time left" if $self->left_time() == 0;
+  my $points = $self->try($word);
+  $points ? "Points: ".$points : "Invalid word!";
 }
 
 # check if a word is correct
-sub try{
+sub try {
 	my ($self, $newWord) = @_;
 	if ($self->check($newWord,$self->word) and $self->find($newWord)
-		and not $self->double($newWord)
-		and ($newWord ne $self->word)){
+        and not $self->double($newWord)  and ($newWord ne $self->word)){
 		push (@{$self->words},  $newWord);
 		my $points = $self->calculate($newWord);
 		$self->points($self->points + $points);
-		$self->isSaved(0);
+		$self->is_saved(0);
 		return $points;
 	}
 	0;
@@ -91,18 +88,11 @@ sub try{
 sub calculate {
 	my ($self , $word) = @_;
 	my $points = length($word);
-	$points += $self->count('b',$word);
-	$points += $self->count('v',$word);
-	$points += $self->count('k',$word);
-	$points += $self->count('j',$word)*3;
-	$points += $self->count('q',$word)*3;
-	$points += $self->count('x',$word)*3;
-	$points += $self->count('z',$word)*3;
-	$points += $self->count('y',$word)*1;
-	if (length($word) > 9){
+  $points += reduce { $a + $b} map { $self->count($_, $word) } ('b', 'v', 'k', 't', 'c');
+  $points += reduce { $a + $b} map { 3 * $self->count($_, $word) } ('j', 'q', 'x', 'y', 'z');
+   if (length($word) > 9) {
 		$points = $points * 3;
-	}
-	elsif (length($word) > 5){
+	}	elsif (length($word) > 5) {
 		$points  = $points * 2;
 	}
 	$points;
@@ -172,13 +162,13 @@ sub count($$$) {
 	$count;
 }
 
-#get the info for a player in string format
-sub info {
-	my ($self) = @_; 
+# Used to serialize the info for a player
+sub serialize {
+	my ($self) = @_;
 	my $result = "Name : ".$self->name.";";
 	$result .= "Points : ".$self->points.";";
-	$result .= "In process : ".$self->inProcess.";";
-	$result .= "Start last game : ".localtime($self->startTime).";";
+	$result .= "In process : ".$self->in_process.";";
+	$result .= "Start last game : ".localtime($self->start_time).";";
 	$result;
 }
 1;

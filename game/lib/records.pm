@@ -1,9 +1,11 @@
-#!/usr/bin/perl
-package  RECORDS;
-use DBI qw(:sql_types);
-my $dbfile = "C:\\Perl64\\game\\records.db";
+#!/usr/bin/perl -w
 
-# The save function saves player result.
+package  RECORDS;
+
+use DBI qw(:sql_types);
+my $dbfile = "C:/Perl64/game/resources/records.db";
+
+# Used to save player result.
 sub save {
 	my $name = shift;
 	die "Error!!! This is a class method" if ref $name;
@@ -12,7 +14,6 @@ sub save {
 	my $check = $dbh->table_info("%","%","records","TABLE");
 	#if there is no DB, create it
 	if (!$check->fetch) {
-		print "initial import";
 		$dbh->do(qq{
 		CREATE TABLE records(
 			id integer primary key autoincrement,
@@ -28,15 +29,13 @@ sub save {
 	$sth->execute($name, $points);
 }
 
-# The max function finds the player with maximum points
+# Used to find the player with maximum points
 sub max {
 my ($class) = shift;
 	die "error" if ref $class;
-	my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","");
-	my $check = $dbh->table_info("%","%","records","TABLE");
-	if (!$check->fetch) {
-		return "No scores";
-	}
+	my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile", "", "");
+	my $check = $dbh->table_info("%", "%", "records", "TABLE");
+	return "No scores" if (!$check->fetch);
 	my $stmax = $dbh->prepare(qq {
 		SELECT *
 		from (
@@ -49,6 +48,6 @@ my ($class) = shift;
 		}) or die $!;
 	$stmax->execute();
 	my ($points, $name) = $stmax->fetchrow_array();
-	$points." -> ". $name;
+	$points." points -> ". $name;
 }
 1;
